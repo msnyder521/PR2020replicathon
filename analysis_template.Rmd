@@ -6,7 +6,7 @@ author: Team members names
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ## Instructions:
@@ -19,6 +19,9 @@ For each answer, include text by simply typing below the question. Include code 
 
 ```{r}
 #Your code goes here
+library(tidyverse)
+summarizedData <- readRDS("./data/summarizedPharmacoData.rds")
+pharmacodata<-readRDS("./data/rawPharmacoData.rds")
 ```
 
 You may find it helpful to use the version control and code sharing system called GitHub to work together with your team so that all of you can edit the same document and keep track of its changes. Here is a [setup guide](https://github.com/datasciencelabs/2016/blob/master/lectures/git-and-github/setting-up-git.Rmd) and [brief introduction to Git and GitHub](https://github.com/datasciencelabs/2016/blob/master/lectures/git-and-github/version-control.Rmd) from another course. The mentors will be able to help if you run into problems. 
@@ -27,33 +30,125 @@ You may find it helpful to use the version control and code sharing system calle
 
 ### Exploratory analysis of pharmacogenomic data
 
-1. How many cell-lines are contained in the data?
+1. How many cell-lines are contained in the data? 
+```{r}
 
-2. What drug concentrations were used in each study?
+cell_line<- pharmacodata$cellLine
+
+counter<-0
+newvec<-vector()
+for (i in cell_line){
+  if (i %in% newvec==FALSE){
+    newvec<-c(newvec, i)
+    counter=counter+1
+  }
+}
+print(counter)
+```
+
+
+2. What drug concentrations were used in each study? 15
+```{r}
+length(unique(pharmacodata$drug))
+```
+
+
+```{r}
+```
+
 
 3. Histograms, appart from telling us how the data is
 distributed, can also make evident potential
 problems with the data. Plot a histogram
 of drug viabilities. Does it look as one would
 expect from the description of the data?
+```{r}
+
+pharmacodata %>%
+  ggplot(aes(x = viability)) +
+  geom_histogram(fill = "gray", color = "black", binwidth = 20) +
+  facet_wrap(~ study) +
+  ggtitle("Distributions of viability by study")
+```
+
+
+The data looks as though a lot of the trials resulted in 100% viability, meaning the drugs were not effective, while very few trials showed a 0% viability which would be claiming high drug sensitivity. 
 
 4. How many viability data points are within the
 expected range according to the definition of viability (e.g. above 0 
 and below 100)? Try to come up with explanations about
 the values that are out of range. Are these due to technical
-issues? Biology?
+issues? Biology? There are 27626 total trials with expected viability data points between 0 and 100 (percentages).
+
+```{r}
+pharmacodata %>%
+  summarize(min_viability = min(viability),
+            max_viability = max(viability),
+            n_too_small   = sum(viability < 0),
+            n_too_big     = sum(viability > 100))
+```
+
+There are still 15778 data points out of the expected range. There are a lot of values greater than 100 which might be due to the treatment and way in which the cell viability was calculated. If the proxy for cell viability was affected by the treatment of the drug, then the percents would be off because of the incorrect inferred cell viability. 
 
 5. Read the csv file containing the summarized data. What kinds
 of variables are in the data? What does each column represent?
 
+```{r}
+head(summarizedData)
+```
+
+
+There is cell line, drug type, and then ic50 and auc for each study. IC50 is the point where 50% of the cells are viable in the cell line being treated. 
+
 6. Plot histograms of the viability scores at different levels of drug
 doses. Are stronger drug concentrations consistent with lower viability scores?
+
+```{r}
+gp <- pharmacodata %>%
+  ggplot(aes(y = viability, x = drug, fill = study)) +
+  scale_x_discrete() + 
+  annotate(geom = "rect", ymin = 0, ymax = 100, xmin = -Inf, xmax = Inf,
+           fill = 'black', alpha = 1/6) +
+  geom_boxplot(outlier.alpha = 1/5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1/2)) +
+  ggtitle("Distributions of viability scores by drug and study")
+gp
+```
 
 ### Using Correlation Measures to Assess Replicability of Drug Response Studies
 
 1. Create a scatterplot for each drug comparing the AUC in GDSC and CCLE for all cell lines (hint: code from Tutorial 1b may help).
 
+```{r}
+#scattereplot for cell line response to drugs across studies
+
+
+summarizedData %>%
+  ggplot(aes(x = -log10(auc_GDSC / 10^6),
+             y = -log10(auc_CCLE / 10^6))) +
+  geom_point(cex = 1/2) + 
+  facet_wrap(~ drug) +
+  xlab("-log10(GDSC auc/10^6)") +
+  ylab("-log10(CCLE auc/10^6)") +
+  ggtitle("AUC summaries of cell line response to drugs across studies")
+```
+```{r}
+summarizedData %>%
+  ggplot(aes(x = -log10(ic50_GDSC / 10^6),
+             y = -log10(ic50_CCLE / 10^6))) +
+  geom_point(cex = 1/2) + 
+  facet_wrap(~ drug) +
+  xlab("-log10(GDSC IC50/10^6)") +
+  ylab("-log10(CCLE IC50/10^6)") +
+  ggtitle("IC50 summaries of cell line response across studies")
+
+```
+
+
 2. Calculate correlation coefficients of the AUC in GDSC and CCLE for each drug (hint: code from Tutorial 1b may help). 
+
+
+
 
 3. Based on the scatterplot and correlation values, would you say that they tend to agree? Why or why not?
 
@@ -62,6 +157,49 @@ doses. Are stronger drug concentrations consistent with lower viability scores?
 5. Which drug do you think shows the most consistency between the studies? How about the least? 
 
 6. If you calculated more than one type of correlation coefficient (for example Pearson and Spearman), how do they differ? Which do you think is a better summary of the consistency between the two studies? 
+```{r}
+drugCorrs <- summarizedData %>% 
+  group_by(drug) %>%
+  summarize(Pearson_ic50  = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "pearson"),
+            Spearman_ic50 = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "spearman"))
+
+
+drugCorrs
+
+drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
+
+drugCorrs
+drugCorrs %>%
+  ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
+  geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_grey() +
+  ylim(0, 1) + 
+  ggtitle("Correlation of cell line IC50 summaries between studies for each drug")
+
+```
+```{r}
+drugCorrs <- summarizedData %>% 
+  group_by(drug) %>%
+  summarize(Pearson_auc  = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "pearson"),
+            Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
+
+
+drugCorrs
+
+drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
+
+drugCorrs
+drugCorrs %>%
+  ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
+  geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_grey() +
+  ylim(0, 1) +
+  ggtitle("Correlation of cell line AUC summaries between studies for each drug")
+
+```
+
 
 7. We have explored Pearson and Spearman correlation, but what about other correlation measures? For example, you could try out distance correlation, which is sensitive to nonlinear relationships. You can find this measure in the `energy` R package, which you'll need to install and load with the following commands:
 
