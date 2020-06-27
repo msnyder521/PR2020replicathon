@@ -128,6 +128,8 @@ gp
 gp + ylim(0, 200)
 ```
 
+Figure 2: In general, we see lower viability of cells while drug concentration increases. Drugs 17-AAG, poaclitaxel, PD-0325901, and TAE684 impact the most in the viability of cell-lines.
+
 ### Using Correlation Measures to Assess Replicability of Drug Response Studies
 
 1. Create a scatterplot for each drug comparing the AUC in GDSC and CCLE for all cell lines (hint: code from Tutorial 1b may help).
@@ -249,11 +251,13 @@ drugCorrs %>%
     
     **Matthews'** correlation coefficient: measures the degree of agreement between *categorical* variables.
 ```{r}
-
+# dividing into sensitivity/resistance of the summarized data and making the table for sensitive and resistant cells
 summarizedData <- summarizedData %>% 
               mutate(cutoff = ifelse(drug == "paclitaxel", 0.4, 0.1),
                      sensitivity_GDSC = factor(ifelse( auc_GDSC < cutoff, "Resistant", "Sensitive")), 
-                     sensitivity_CCLE = factor(ifelse( auc_CCLE < cutoff, "Resistant", "Sensitive"))) 
+                     sensitivity_CCLE = factor(ifelse( auc_CCLE < cutoff, "Resistant", "Sensitive")))
+
+#table specific code
 
 table("GDSC" = summarizedData$sensitivity_GDSC,
       "CCLE" = summarizedData$sensitivity_CCLE)
@@ -263,6 +267,7 @@ table("GDSC" = summarizedData$sensitivity_GDSC,
     1854 of the drug-cell lines combinations agree for both sensitivity and resistante between the two studies.
 
 ```{r}
+#table for sensitive and resistant cell lines plus categories labels
 summarizedData <-
     summarizedData %>% 
     mutate(category = paste(sensitivity_GDSC, sensitivity_CCLE),
@@ -275,6 +280,7 @@ table(summarizedData$category)
 ```
 
 ```{r, sensitivity-all-drugs, fig.width = 12, fig.height = 9}
+#figure of cell sensitivity classifications between studies  using AUC rather than ic50 because has better correlation in original scatterplots
 ggplot(summarizedData, aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
     geom_point(cex = 0.5) + 
     facet_wrap(~ drug) +
@@ -287,6 +293,7 @@ ggplot(summarizedData, aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
     
     
 ```{r, matthews}
+#matthews correlation with sensitive and resistant categories defined
 mcc <- function (study1, study2) {
     BS <- sum(study1 == "Sensitive" & study2 == "Sensitive") 
     BR <- sum(study1 == "Resistant" & study2 == "Resistant") 
@@ -305,6 +312,7 @@ mcc <- function (study1, study2) {
     
 
 ```{r}
+#matthews correlation for table based on each drug
 drugCorrs <- summarizedData %>% 
     group_by(drug) %>% 
     summarise(matthews_corr = mcc(sensitivity_GDSC, sensitivity_CCLE))
@@ -313,7 +321,7 @@ drugCorrs
 
 ```{r, matt}
 
-
+#bar graph of the matthews corerlations for each drug across both studies
 
 ggplot(drugCorrs, aes(x = drug, y = matthews_corr)) +
     geom_bar(stat = "identity") + 
