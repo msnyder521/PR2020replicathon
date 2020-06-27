@@ -1,8 +1,8 @@
 ---
-title: "Insert your team name here"
+title: PANDAS
 output: html_document
 date: Replicathon 2020
-author: Team members names
+author: Madison Snyder and Magdiel Miranda
 ---
 
 ```{r setup, include=FALSE}
@@ -32,7 +32,7 @@ You may find it helpful to use the version control and code sharing system calle
 
 1. How many cell-lines are contained in the data? 
 ```{r}
-
+#code for determining number of cell lines
 cell_line<- pharmacodata$cellLine
 
 counter<-0
@@ -49,6 +49,7 @@ print(counter)
 
 2. What drug concentrations were used in each study? 15
 ```{r}
+#code for determining number of drug concentrations
 length(unique(pharmacodata$drug))
 ```
 
@@ -63,7 +64,7 @@ problems with the data. Plot a histogram
 of drug viabilities. Does it look as one would
 expect from the description of the data?
 ```{r}
-
+#determining distributions of viability by histogram between the two studies
 pharmacodata %>%
   ggplot(aes(x = viability)) +
   geom_histogram(fill = "gray", color = "black", binwidth = 20) +
@@ -81,6 +82,7 @@ the values that are out of range. Are these due to technical
 issues? Biology? There are 27626 total trials with expected viability data points between 0 and 100 (percentages).
 
 ```{r}
+#table version of the viability scores from 0-100 or out of range
 pharmacodata %>%
   summarize(min_viability = min(viability),
             max_viability = max(viability),
@@ -94,6 +96,7 @@ There are still 15778 data points out of the expected range. There are a lot of 
 of variables are in the data? What does each column represent?
 
 ```{r}
+#brief view of the summarized data variables
 head(summarizedData)
 ```
 
@@ -104,15 +107,25 @@ There is cell line, drug type, and then ic50 and auc for each study. IC50 is the
 doses. Are stronger drug concentrations consistent with lower viability scores?
 
 ```{r}
+
+```
+
+```{r}
+#drug viability box plot
 gp <- pharmacodata %>%
-  ggplot(aes(y = viability, x = drug, fill = study)) +
-  scale_x_discrete() + 
-  annotate(geom = "rect", ymin = 0, ymax = 100, xmin = -Inf, xmax = Inf,
-           fill = 'black', alpha = 1/6) +
-  geom_boxplot(outlier.alpha = 1/5) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1/2)) +
-  ggtitle("Distributions of viability scores by drug and study")
+    ggplot(aes(y = viability, x = drug, fill = doseID)) +
+    scale_x_discrete() + 
+    annotate(geom = "rect", ymin = 0, ymax = 100, xmin = -Inf, xmax = Inf,
+             fill = 'black', alpha = 1/6) +
+    geom_boxplot(outlier.alpha = 1/5) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1/2)) +
+    ggtitle("Distributions of viability scores by drug dose")
 gp
+```
+
+```{r viability-boxplots-limit, fig.width = 8, fig.height = 4, warning = FALSE}
+#viability by drug dose extended box plot
+gp + ylim(0, 200)
 ```
 
 ### Using Correlation Measures to Assess Replicability of Drug Response Studies
@@ -133,6 +146,7 @@ summarizedData %>%
   ggtitle("AUC summaries of cell line response to drugs across studies")
 ```
 ```{r}
+# ic50 summaries of cell line response for both studies
 summarizedData %>%
   ggplot(aes(x = -log10(ic50_GDSC / 10^6),
              y = -log10(ic50_CCLE / 10^6))) +
@@ -158,17 +172,19 @@ summarizedData %>%
 
 6. If you calculated more than one type of correlation coefficient (for example Pearson and Spearman), how do they differ? Which do you think is a better summary of the consistency between the two studies? 
 ```{r}
+#correlation coefficients for both studies using pearson and spearman methods
 drugCorrs <- summarizedData %>% 
   group_by(drug) %>%
   summarize(Pearson_ic50  = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "pearson"),
             Spearman_ic50 = cor(-log10(ic50_GDSC / 10^6), -log10(ic50_CCLE / 10^6), method = "spearman"))
 
-
+#reorganizing for graphic
 drugCorrs
 
 drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
 
 drugCorrs
+#graphic of correlation coefficient for IC50
 drugCorrs %>%
   ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
   geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
@@ -179,17 +195,19 @@ drugCorrs %>%
 
 ```
 ```{r}
+#auc correlation coefficients by both methods (pearson and spearman)
 drugCorrs <- summarizedData %>% 
   group_by(drug) %>%
   summarize(Pearson_auc  = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "pearson"),
             Spearman_auc = cor(-log10(auc_GDSC / 10^6), -log10(auc_CCLE / 10^6), method = "spearman"))
 
-
+#reorganizing for the graphic
 drugCorrs
 
 drugCorrs <- gather(drugCorrs, measure, correlation, -drug)
 
 drugCorrs
+#graphic of the two correlation coefficients for AUC 
 drugCorrs %>%
   ggplot(aes(x = drug, y = correlation, fill = measure, group = measure)) +
   geom_bar(stat = "identity", position = position_dodge(), colour = "black") + 
@@ -223,6 +241,87 @@ drugCorrs %>%
 5. Compare the Matthews correlation coefficient values by drug classes defined in Tutorial 2a (No effect, Narrow effect, Broad effect). Which drug class shows the most agreement between the studies? 
 
 6. Would you say that the sensitivity results for the two studies tend to agree?
+
+    **Pearson's** correlation coefficient: measures the degree of *linear* between variables.
+    **Spearman's** correlation coefficient: measures the agreement of the *rankings* between variables.
+    
+    The most appropiate one is:
+    
+    **Matthews'** correlation coefficient: measures the degree of agreement between *categorical* variables.
+```{r}
+
+summarizedData <- summarizedData %>% 
+              mutate(cutoff = ifelse(drug == "paclitaxel", 0.4, 0.1),
+                     sensitivity_GDSC = factor(ifelse( auc_GDSC < cutoff, "Resistant", "Sensitive")), 
+                     sensitivity_CCLE = factor(ifelse( auc_CCLE < cutoff, "Resistant", "Sensitive"))) 
+
+table("GDSC" = summarizedData$sensitivity_GDSC,
+      "CCLE" = summarizedData$sensitivity_CCLE)
+```
+   
+    1289 + 565 = 1854
+    1854 of the drug-cell lines combinations agree for both sensitivity and resistante between the two studies.
+
+```{r}
+summarizedData <-
+    summarizedData %>% 
+    mutate(category = paste(sensitivity_GDSC, sensitivity_CCLE),
+           category = fct_recode(category,
+                                 "Both Resistant" = "Resistant Resistant",
+                                 "Both Sensitive" = "Sensitive Sensitive",
+                                 "GDSC Resistant / CCLE Sensitive" = "Resistant Sensitive",
+                                 "GDSC Sensitive / CCLE Resistant" = "Sensitive Resistant"))
+table(summarizedData$category)
+```
+
+```{r, sensitivity-all-drugs, fig.width = 12, fig.height = 9}
+ggplot(summarizedData, aes(x = auc_GDSC, y = auc_CCLE, colour = category)) +
+    geom_point(cex = 0.5) + 
+    facet_wrap(~ drug) +
+    xlab("GDSC AUC") +
+    ylab("CCLE AUC") +
+    geom_hline(aes(yintercept = cutoff), colour = "grey", alpha = 0.75, lty = 2) +
+    geom_vline(aes(xintercept = cutoff), colour = "grey", alpha = 0.75, lty = 2) +
+    ggtitle("Cell line sensitivity classifications between studies")
+```
+    
+    
+```{r, matthews}
+mcc <- function (study1, study2) {
+    BS <- sum(study1 == "Sensitive" & study2 == "Sensitive") 
+    BR <- sum(study1 == "Resistant" & study2 == "Resistant") 
+    SR <- sum(study1 == "Sensitive" & study2 == "Resistant") 
+    RS <- sum(study1 == "Resistant" & study2 == "Sensitive") 
+    
+    if (BS+SR == 0 | BS+RS == 0 | BR+SR == 0 |  BR+RS ==0){
+        mcc <- ((BS*BR)-(SR*RS)) 
+    }else{
+        mcc <- ((BS*BR)-(SR*RS)) / sqrt(exp((log(BS+SR)+log(BS+RS)+log(BR+SR)+log(BR+RS))))
+    }
+    return(mcc)
+}
+
+```
+    
+
+```{r}
+drugCorrs <- summarizedData %>% 
+    group_by(drug) %>% 
+    summarise(matthews_corr = mcc(sensitivity_GDSC, sensitivity_CCLE))
+drugCorrs
+```
+
+```{r, matt}
+
+
+
+ggplot(drugCorrs, aes(x = drug, y = matthews_corr)) +
+    geom_bar(stat = "identity") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Drug") +
+    ylab("Matthews Correlation Coefficient")
+```
+
 
 7. For one of the targeted drugs, examine the cell lines that were sensitive in the CCLE and/or GDSC. See if you can find out what types of cells these are by searching the online Cancer Cell Line Encyclopedia http://www.broadinstitute.org/ccle (this will prompt you to register with a username, password, and email address. If you prefer, you can also search the cell line on other websites). See if you can find out what types of cancers this drug is targeted for using the NCI cancer drug database at https://www.cancer.gov/about-cancer/treatment/drugs. Does the list of cell lines found to be sensitive in the two studies agree with this?
 
